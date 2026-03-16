@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useWallet } from '../contexts/WalletContext';
 import {
@@ -17,7 +17,8 @@ import {
 } from 'lucide-react';
 
 const Dashboard = () => {
-  const { walletAddress, ownedNFTs } = useWallet();
+  const { walletAddress, chainId } = useWallet();
+  const networkName = chainId === '0x7a69' ? 'Hardhat Local' : chainId === '0xaa36a7' ? 'Sepolia' : 'Unknown';
   const [rooms, setRooms] = useState([]);
   const [userNFTs, setUserNFTs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -25,7 +26,6 @@ const Dashboard = () => {
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState(null);
   const [roomForm, setRoomForm] = useState({ name: '', isPrivate: false, mintNFT: false, nftName: '', nftURI: '' });
-  const eventListenerRef = useRef(null); // kept for future use
 
   const formatAddress = (addr) => addr ? `${addr.slice(0, 6)}...${addr.slice(-4)}` : '';
   const formatDate = (ts) => {
@@ -81,6 +81,7 @@ const Dashboard = () => {
   useEffect(() => {
     fetchRooms();
     fetchUserNFTs();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [walletAddress]);
 
   const handleCreateRoom = async (e) => {
@@ -136,7 +137,7 @@ const Dashboard = () => {
           { icon: MessageSquare, color: 'primary', label: 'Total Rooms', value: rooms.length },
           { icon: Plus, color: 'blue', label: 'Rooms Created', value: createdRooms.length },
           { icon: Crown, color: 'green', label: 'Owned NFTs', value: userNFTs.length },
-          { icon: Users, color: 'purple', label: 'Network', value: 'Sepolia' },
+          { icon: Users, color: 'purple', label: 'Network', value: networkName },
         ].map(({ icon: Icon, color, label, value }) => (
           <div key={label} className="card">
             <div className="flex items-center space-x-3">

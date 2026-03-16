@@ -166,30 +166,30 @@ const About = () => {
       <div className="card">
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Join Our Community</h2>
         <div className="flex flex-wrap gap-4">
-          <a
-            href="#"
+          <button
+            type="button"
             className="flex items-center space-x-2 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors duration-200"
           >
             <Github className="w-4 h-4" />
             <span>GitHub</span>
             <ExternalLink className="w-3 h-3" />
-          </a>
-          <a
-            href="#"
+          </button>
+          <button
+            type="button"
             className="flex items-center space-x-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors duration-200"
           >
             <Twitter className="w-4 h-4" />
             <span>Twitter</span>
             <ExternalLink className="w-3 h-3" />
-          </a>
-          <a
-            href="#"
+          </button>
+          <button
+            type="button"
             className="flex items-center space-x-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors duration-200"
           >
             <MessageSquare className="w-4 h-4" />
             <span>Discord</span>
             <ExternalLink className="w-3 h-3" />
-          </a>
+          </button>
         </div>
       </div>
 

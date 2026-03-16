@@ -13,6 +13,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { ethers } from 'ethers';
+import { switchToHardhatLocal, switchToSepolia, isHardhatContract } from '../utils/contract';
 
 const WalletContext = createContext();
 
@@ -32,15 +33,16 @@ export const WalletProvider = ({ children }) => {
   const [error, setError] = useState(null);
   const [networkError, setNetworkError] = useState(null);
   const [provider, setProvider] = useState(null);
-  const [ownedNFTs, setOwnedNFTs] = useState([]); // For future NFT integration
+  const [ownedNFTs] = useState([]); // For future NFT integration
   const [userProfile, setUserProfile] = useState({
     displayName: '',
     bio: '',
     avatar: ''
   });
 
-  // Sepolia testnet chain ID
-  const SEPOLIA_CHAIN_ID = '0xaa36a7'; // 11155111 in decimal
+  // Supported chain IDs
+  const SEPOLIA_CHAIN_ID = '0xaa36a7'; // 11155111
+  const HARDHAT_CHAIN_ID = '0x7a69';   // 31337
 
   /**
    * Check if MetaMask is installed
@@ -65,8 +67,8 @@ export const WalletProvider = ({ children }) => {
    * Check if on Sepolia network
    */
   const isSepoliaNetwork = useCallback((chainIdHex) => {
-    return chainIdHex === SEPOLIA_CHAIN_ID;
-  }, [SEPOLIA_CHAIN_ID]);
+    return chainIdHex === SEPOLIA_CHAIN_ID || chainIdHex === HARDHAT_CHAIN_ID;
+  }, [SEPOLIA_CHAIN_ID, HARDHAT_CHAIN_ID]);
 
   /**
    * Switch to Sepolia network
@@ -142,18 +144,27 @@ export const WalletProvider = ({ children }) => {
         method: 'eth_chainId'
       });
 
-      // Check if on Sepolia network
-      if (!isSepoliaNetwork(chainIdHex)) {
-        setNetworkError('Please switch to Sepolia testnet to use DeChat.');
-        console.warn('⚠️ Not on Sepolia network. Current chain ID:', chainIdHex);
+      // Auto-switch to correct network
+      try {
+        if (isHardhatContract()) {
+          if (chainIdHex !== HARDHAT_CHAIN_ID) await switchToHardhatLocal();
+        } else {
+          if (chainIdHex !== SEPOLIA_CHAIN_ID) await switchToSepolia();
+        }
+      } catch (_) { /* user may dismiss — non-fatal */ }
+
+      const finalChainId = await window.ethereum.request({ method: 'eth_chainId' });
+      if (!isSepoliaNetwork(finalChainId)) {
+        setNetworkError('Please switch to Sepolia or Hardhat Local network to use DeChat.');
+        console.warn('⚠️ Not on correct network. Current chain ID:', finalChainId);
       }
 
       // Initialize provider
-      const ethersProvider = initializeProvider();
+      initializeProvider();
 
       // Update state
       setAccount(address);
-      setChainId(chainIdHex);
+      setChainId(finalChainId);
       setIsConnected(true);
 
       // Persist to localStorage
@@ -270,14 +281,25 @@ export const WalletProvider = ({ children }) => {
               method: 'eth_chainId'
             });
 
+            // Auto-switch to correct network based on contract address
+            try {
+              if (isHardhatContract()) {
+                if (chainIdHex !== HARDHAT_CHAIN_ID) await switchToHardhatLocal();
+              } else {
+                if (chainIdHex !== SEPOLIA_CHAIN_ID) await switchToSepolia();
+              }
+            } catch (_) { /* user may dismiss — non-fatal */ }
+
+            const finalChainId = await window.ethereum.request({ method: 'eth_chainId' });
+
             initializeProvider();
             setAccount(accounts[0]);
-            setChainId(chainIdHex);
+            setChainId(finalChainId);
             setIsConnected(true);
 
             // Check network
-            if (!isSepoliaNetwork(chainIdHex)) {
-              setNetworkError('Please switch to Sepolia testnet to use DeChat.');
+            if (!isSepoliaNetwork(finalChainId)) {
+              setNetworkError('Please switch to Sepolia or Hardhat Local network to use DeChat.');
             }
 
             console.log('🔄 Auto-connected to wallet:', accounts[0]);
@@ -295,7 +317,7 @@ export const WalletProvider = ({ children }) => {
     };
 
     autoConnect();
-  }, [isMetaMaskInstalled, initializeProvider]);
+  }, [isMetaMaskInstalled, initializeProvider, isSepoliaNetwork]);
 
   /**
    * Listen for account changes
@@ -335,7 +357,7 @@ export const WalletProvider = ({ children }) => {
       
       // Check if on Sepolia
       if (!isSepoliaNetwork(newChainId)) {
-        setNetworkError('Please switch to Sepolia testnet to use DeChat.');
+        setNetworkError('Please switch to Sepolia or Hardhat Local network to use DeChat.');
       } else {
         setNetworkError(null);
       }
@@ -349,7 +371,7 @@ export const WalletProvider = ({ children }) => {
     return () => {
       window.ethereum.removeListener('chainChanged', handleChainChanged);
     };
-  }, [isMetaMaskInstalled]);
+  }, [isMetaMaskInstalled, isSepoliaNetwork]);
 
   const value = {
     // State

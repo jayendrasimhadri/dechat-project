@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { getRoom, sendRoomMessage, getRoomMessages, joinPublicRoom, joinPrivateRoom, isMember, parseContractError } from '../utils/contract';
+import { getRoom, getAllRooms, sendRoomMessage, getRoomMessages, joinPublicRoom, joinPrivateRoom, isMember, parseContractError } from '../utils/contract';
 import { onMessageSent } from '../utils/events';
 import { useWallet } from '../contexts/WalletContext';
 import {
@@ -35,7 +35,16 @@ const ChatRoom = () => {
 
   const fetchRoomData = async () => {
     try {
-      const roomData = await getRoom(roomId);
+      let roomData = null;
+
+      // Try getRoom first; fall back to scanning getAllRooms if it reverts
+      try {
+        roomData = await getRoom(roomId);
+      } catch (_) {
+        const allRooms = await getAllRooms();
+        roomData = allRooms.find(r => String(r.id) === String(roomId)) || null;
+      }
+
       if (!roomData?.exists) { setError('Room not found'); return null; }
       const r = {
         id: Number(roomData.id),
@@ -168,6 +177,7 @@ const ChatRoom = () => {
         eventListenerRef.current = null;
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomId, walletAddress]); // re-run if wallet connects after mount
 
   useEffect(() => {
@@ -178,6 +188,7 @@ const ChatRoom = () => {
         eventListenerRef.current = null;
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [room, loading, roomId]);
 
   useEffect(() => { scrollToBottom(); }, [messages]);

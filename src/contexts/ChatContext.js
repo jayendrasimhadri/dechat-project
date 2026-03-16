@@ -170,6 +170,7 @@ export const ChatProvider = ({ children }) => {
     if (chat && chat.messages.length === 0) {
       loadPrivateMessages(activeChatId, chat.participants);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeChatId]);
 
   const setWallet = (walletAddress) => {

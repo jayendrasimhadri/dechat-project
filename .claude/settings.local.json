@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /d/Projects/Personals/Jayendra/dechat-project/server -type f -name *.js -o -name *.json)",
+      "Bash(find /d/Projects/Personals/Jayendra/dechat-project/blockchain -type f \\\\\\(-name *.sol -o -name *.js \\\\\\) ! -path */node_modules/* ! -path */artifacts/*)",
+      "Bash(grep -r \"CRITICAL\\\\|ERROR\\\\|TODO\\\\|FIXME\\\\|BUG\" /d/Projects/Personals/Jayendra/dechat-project/src --include=*.js --include=*.jsx)",
+      "Bash(grep -n \"export default\\\\|export const\\\\|export function\" /d/Projects/Personals/Jayendra/dechat-project/src/pages/*.js)",
+      "Bash(ls -la D:/Projects/Personals/Jayendra/dechat-project/.env*)"
+    ]
+  }
+}

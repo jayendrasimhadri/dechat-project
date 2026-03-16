@@ -1,11 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useWallet } from '../contexts/WalletContext';
 import { getAllListedNFTs, mintNFT, listNFT, buyNFT, parseContractError } from '../utils/contract';
 import { onNFTMinted, onNFTListed, onNFTPurchased } from '../utils/events';
-import { ethers } from 'ethers';
 import {
   ShoppingCart, Plus, Sparkles, Loader, AlertCircle,
-  RefreshCw, Tag, Image as ImageIcon, User, ExternalLink, X, DollarSign, CheckCircle
+  RefreshCw, Image as ImageIcon, User, ExternalLink, X, DollarSign, CheckCircle
 } from 'lucide-react';
 
 const Marketplace = () => {
@@ -19,7 +18,6 @@ const Marketplace = () => {
   const [minting, setMinting] = useState(false);
   const [mintError, setMintError] = useState(null);
   const [mintSuccess, setMintSuccess] = useState(false);
-  const eventListenerRef = useRef(null); // kept for future use
 
   const formatAddress = (addr) => addr ? `${addr.slice(0, 6)}...${addr.slice(-4)}` : '';
   const isMyNFT = (owner) => walletAddress && owner?.toLowerCase() === walletAddress.toLowerCase();

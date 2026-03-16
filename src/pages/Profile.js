@@ -64,7 +64,10 @@ const Profile = () => {
     }
   };
 
-  useEffect(() => { fetchData(); }, [walletAddress]);
+  useEffect(() => {
+    fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [walletAddress]);
   useEffect(() => { setEditForm(userProfile || {}); }, [userProfile]);
 
   const copyAddress = async () => {
