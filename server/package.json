@@ -1,0 +1,25 @@
+{
+  "name": "dechat-ipfs-hash-server",
+  "version": "1.0.0",
+  "description": "Simple server to store IPFS hashes for DeChat messaging",
+  "main": "ipfs-hash-server.js",
+  "scripts": {
+    "start": "node ipfs-hash-server.js",
+    "dev": "nodemon ipfs-hash-server.js"
+  },
+  "keywords": [
+    "ipfs",
+    "chat",
+    "decentralized"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "socket.io": "^4.8.3"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.22"
+  }
+}
