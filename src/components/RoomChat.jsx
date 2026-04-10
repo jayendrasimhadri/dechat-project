@@ -6,7 +6,7 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { getContract, getContractReadOnly } from '../utils/contract';
+import { getRoomMessages, sendRoomMessage, joinPublicRoom, joinPrivateRoom, parseContractError, getContractReadOnly } from '../utils/contract';
 import { useWallet } from '../contexts/WalletContext';
 import { Send, Loader, AlertCircle, MessageSquare, RefreshCw, Lock, LogIn } from 'lucide-react';
 
@@ -144,18 +144,15 @@ const RoomChat = ({ roomId }) => {
     try {
       console.log('📥 Fetching messages for room:', roomId);
 
-      // Get contract instance (read-only)
-      const contract = await getContractReadOnly();
-
-      // Fetch messages
-      const roomMessages = await contract.getMessages(roomId);
+      // Use utility which tries signer first (required for onlyMember check)
+      const rawMessages = await getRoomMessages(roomId);
 
       // Transform data for display
-      const messagesData = roomMessages.map((msg, index) => ({
+      const messagesData = rawMessages.map((msg, index) => ({
         id: index,
         sender: msg.sender,
         content: msg.content,
-        timestamp: msg.timestamp.toString()
+        timestamp: (new Date(msg.timestamp).getTime() / 1000).toString()
       }));
 
       setMessages(messagesData);
@@ -183,18 +180,13 @@ const RoomChat = ({ roomId }) => {
     try {
       console.log('🚪 Joining room:', roomId);
 
-      // Get contract instance with signer
-      const contract = await getContract();
+      if (roomInfo?.isPrivate) {
+        await joinPrivateRoom(roomId);
+      } else {
+        await joinPublicRoom(roomId);
+      }
 
-      // Join room
-      const tx = await contract.joinRoom(roomId);
-      
-      console.log('📝 Transaction sent:', tx.hash);
-
-      // Wait for confirmation
-      const receipt = await tx.wait();
-      
-      console.log('✅ Joined room! Receipt:', receipt);
+      console.log('✅ Joined room!');
 
       // Update member status
       setIsMember(true);
@@ -204,19 +196,12 @@ const RoomChat = ({ roomId }) => {
 
     } catch (err) {
       console.error('Failed to join room:', err);
-
-      // Handle specific error cases
-      if (err.code === 'ACTION_REJECTED' || err.code === 4001) {
-        setError('Transaction rejected by user');
-      } else if (err.message?.includes('insufficient funds')) {
-        setError('Insufficient funds to pay for gas');
-      } else if (err.message?.includes('user rejected')) {
-        setError('Transaction rejected by user');
-      } else if (err.message?.includes('already a member')) {
-        setError('You are already a member of this room');
+      const msg = parseContractError(err).message;
+      if (msg.toLowerCase().includes('already')) {
         setIsMember(true);
-      } else {
-        setError(err.message || 'Failed to join room. Please try again.');
+        await fetchMessages();
+      } else if (!msg.toLowerCase().includes('rejected')) {
+        setError(msg);
       }
     } finally {
       setJoining(false);
@@ -247,41 +232,26 @@ const RoomChat = ({ roomId }) => {
     try {
       console.log('📤 Sending message to room:', roomId);
 
-      // Get contract instance with signer
-      const contract = await getContract();
+      await sendRoomMessage(roomId, messageText.trim());
 
-      // Send message
-      const tx = await contract.sendMessage(roomId, messageText.trim());
-      
-      console.log('📝 Transaction sent:', tx.hash);
-      setTxHash(tx.hash);
+      console.log('✅ Message sent!');
 
-      // Wait for confirmation
-      const receipt = await tx.wait();
-      
-      console.log('✅ Message sent! Receipt:', receipt);
-
-      // Clear input
+      // Add optimistic update then clear input
+      setMessages(prev => [...prev, {
+        id: Date.now(),
+        sender: account,
+        content: messageText.trim(),
+        timestamp: Math.floor(Date.now() / 1000).toString()
+      }]);
       setMessageText('');
       setTxHash(null);
-
-      // Note: No need to manually refresh messages
-      // The event listener will automatically add the new message
+      setTimeout(scrollToBottom, 100);
 
     } catch (err) {
       console.error('Failed to send message:', err);
-
-      // Handle specific error cases
-      if (err.code === 'ACTION_REJECTED' || err.code === 4001) {
-        setError('Transaction rejected by user');
-      } else if (err.message?.includes('insufficient funds')) {
-        setError('Insufficient funds to pay for gas');
-      } else if (err.message?.includes('user rejected')) {
-        setError('Transaction rejected by user');
-      } else if (err.message?.includes('not a member')) {
-        setError('You are not a member of this room');
-      } else {
-        setError(err.message || 'Failed to send message. Please try again.');
+      const msg = parseContractError(err).message;
+      if (!msg.toLowerCase().includes('rejected')) {
+        setError(msg);
       }
     } finally {
       setSending(false);

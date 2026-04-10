@@ -320,10 +320,11 @@ export const sendPrivateMessage = async (toAddress, content) => {
  */
 export const mintNFT = async (name, metadataURI) => {
   if (!name?.trim()) throw new Error('NFT name is required.');
-  if (!metadataURI?.trim()) throw new Error('Metadata URI is required.');
+  // Fall back to a placeholder URI if none provided (contract requires non-empty)
+  const uri = metadataURI?.trim() || `ipfs://dechat/${encodeURIComponent(name.trim())}`;
   await ensureSepolia();
   const contract = await getContract();
-  const tx = await send(contract.mintNFT, [name.trim(), metadataURI.trim()]);
+  const tx = await send(contract.mintNFT, [name.trim(), uri]);
   const receipt = await tx.wait();
   const tokenId = _extractEvent(contract, receipt, 'NFTMinted', 'tokenId');
   return { tokenId, txHash: receipt.hash };
@@ -392,6 +393,16 @@ export const getRoomMessages = async (roomId) => {
 export const isMember = async (roomId, address) => {
   const contract = await getContractReadOnly();
   return contract.isMember(roomId, address);
+};
+
+/**
+ * Get the NFT token ID required to join a private room.
+ * Returns the token ID as a number, or null for public rooms.
+ */
+export const getRoomRequiredNFT = async (roomId) => {
+  const contract = await getContractReadOnly();
+  const tokenId = await contract.roomRequiredNFT(roomId);
+  return Number(tokenId);
 };
 
 // ─── Read: Private messages & contacts ───────────────────────────────────────

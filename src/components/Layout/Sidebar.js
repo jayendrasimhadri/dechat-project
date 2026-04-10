@@ -1,10 +1,11 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { 
-  Home, 
-  MessageSquare, 
-  MessageCircle, 
-  User, 
+import {
+  Home,
+  ShoppingCart,
+  MessageCircle,
+  MessageSquare,
+  User,
   Info,
   Wallet
 } from 'lucide-react';
@@ -12,14 +13,14 @@ import {
 const Sidebar = () => {
   const navItems = [
     { to: '/dashboard', icon: Home, label: 'Dashboard' },
-    { to: '/marketplace', icon: MessageSquare, label: 'Marketplace' },
+    { to: '/marketplace', icon: ShoppingCart, label: 'Marketplace' },
     { to: '/private-chats', icon: MessageCircle, label: 'Private Chats' },
     { to: '/profile', icon: User, label: 'Profile' },
     { to: '/about', icon: Info, label: 'About' }
   ];
 
   return (
-    <div className="w-64 bg-white shadow-lg border-r border-gray-200">
+    <div className="w-64 bg-white shadow-lg border-r border-gray-200 flex flex-col h-full">
       <div className="p-6 border-b border-gray-200">
         <div className="flex items-center space-x-3">
           <div className="w-10 h-10 bg-primary-600 rounded-lg flex items-center justify-center">
@@ -32,7 +33,7 @@ const Sidebar = () => {
         </div>
       </div>
 
-      <nav className="mt-6 px-3">
+      <nav className="mt-6 px-3 flex-1">
         {navItems.map((item) => (
           <NavLink
             key={item.to}
@@ -51,7 +52,7 @@ const Sidebar = () => {
         ))}
       </nav>
 
-      <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200">
+      <div className="p-4 border-t border-gray-200">
         <div className="flex items-center space-x-2 text-sm text-gray-500">
           <Wallet className="w-4 h-4" />
           <span>Wallet Connected</span>

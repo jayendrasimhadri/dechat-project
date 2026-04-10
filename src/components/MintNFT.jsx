@@ -7,11 +7,10 @@
 
 import React, { useState } from 'react';
 import { getContract } from '../utils/contract';
-import { Sparkles, Loader, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { Sparkles, Loader, CheckCircle, XCircle } from 'lucide-react';
 
 const MintNFT = ({ onNFTMinted }) => {
   const [nftName, setNftName] = useState('');
-  const [tokenURI, setTokenURI] = useState('');
   const [isMinting, setIsMinting] = useState(false);
   const [txHash, setTxHash] = useState(null);
   const [error, setError] = useState(null);
@@ -24,14 +23,8 @@ const MintNFT = ({ onNFTMinted }) => {
   const handleMintNFT = async (e) => {
     e.preventDefault();
 
-    // Validate inputs
     if (!nftName.trim()) {
       setError('Please enter an NFT name');
-      return;
-    }
-
-    if (!tokenURI.trim()) {
-      setError('Please enter a token URI');
       return;
     }
 
@@ -42,13 +35,14 @@ const MintNFT = ({ onNFTMinted }) => {
     setMintedTokenId(null);
 
     try {
-      console.log('🎨 Minting NFT:', nftName, tokenURI);
+      console.log('🎨 Minting NFT:', nftName);
 
       // Get contract instance with signer
       const contract = await getContract();
 
-      // Call mintNFT function
-      const tx = await contract.mintNFT(nftName.trim(), tokenURI.trim());
+      // Placeholder URI — contract requires non-empty value
+      const uri = `ipfs://dechat/${encodeURIComponent(nftName.trim())}`;
+      const tx = await contract.mintNFT(nftName.trim(), uri);
       
       console.log('📝 Transaction sent:', tx.hash);
       setTxHash(tx.hash);
@@ -85,7 +79,6 @@ const MintNFT = ({ onNFTMinted }) => {
       // Show success
       setSuccess(true);
       setNftName('');
-      setTokenURI('');
 
       // Call callback
       if (onNFTMinted) {
@@ -214,43 +207,12 @@ const MintNFT = ({ onNFTMinted }) => {
           </p>
         </div>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Token URI (Metadata)
-          </label>
-          <input
-            type="text"
-            value={tokenURI}
-            onChange={(e) => setTokenURI(e.target.value)}
-            placeholder="ipfs://... or https://..."
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-            disabled={isMinting}
-          />
-          <p className="text-xs text-gray-500 mt-1">
-            IPFS URI or HTTP URL pointing to NFT metadata JSON
-          </p>
-        </div>
-
-        {/* Info Box */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-          <div className="flex items-start space-x-2">
-            <AlertCircle className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
-            <div className="text-blue-700 text-sm">
-              <p className="font-medium mb-1">What is Token URI?</p>
-              <p>
-                Token URI is a link to your NFT's metadata (image, description, attributes).
-                You can use IPFS for decentralized storage or any HTTP URL.
-              </p>
-            </div>
-          </div>
-        </div>
-
         {/* Submit Button */}
         <button
           type="submit"
-          disabled={isMinting || !nftName.trim() || !tokenURI.trim()}
+          disabled={isMinting || !nftName.trim()}
           className={`w-full flex items-center justify-center space-x-2 py-3 px-4 rounded-lg font-medium transition-colors ${
-            isMinting || !nftName.trim() || !tokenURI.trim()
+            isMinting || !nftName.trim()
               ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
               : 'bg-primary-600 hover:bg-primary-700 text-white'
           }`}

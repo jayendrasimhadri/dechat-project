@@ -12,6 +12,7 @@ const Header = () => {
   const getNetworkName = (chainIdHex) => {
     const chainIdMap = {
       '0xaa36a7': 'Sepolia',
+      '0x7a69': 'Hardhat',
       '0x1': 'Ethereum',
       '0x89': 'Polygon',
       '0xa': 'Optimism',
@@ -20,7 +21,7 @@ const Header = () => {
     return chainIdMap[chainIdHex] || 'Unknown';
   };
 
-  const isSepoliaNetwork = chainId === '0xaa36a7';
+  const isSepoliaNetwork = chainId === '0xaa36a7' || chainId === '0x7a69';
 
   return (
     <header className="bg-white shadow-sm border-b border-gray-200 px-6 py-4">

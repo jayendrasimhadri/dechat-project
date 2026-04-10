@@ -4,7 +4,7 @@ import { getAllListedNFTs, mintNFT, listNFT, buyNFT, parseContractError } from '
 import { onNFTMinted, onNFTListed, onNFTPurchased } from '../utils/events';
 import {
   ShoppingCart, Plus, Sparkles, Loader, AlertCircle,
-  RefreshCw, Image as ImageIcon, User, ExternalLink, X, DollarSign, CheckCircle
+  RefreshCw, Image as ImageIcon, User, X, DollarSign, CheckCircle
 } from 'lucide-react';
 
 const Marketplace = () => {
@@ -14,7 +14,7 @@ const Marketplace = () => {
   const [error, setError] = useState(null);
   const [buyingId, setBuyingId] = useState(null);
   const [showMint, setShowMint] = useState(false);
-  const [mintForm, setMintForm] = useState({ name: '', uri: '', listPrice: '' });
+  const [mintForm, setMintForm] = useState({ name: '', listPrice: '' });
   const [minting, setMinting] = useState(false);
   const [mintError, setMintError] = useState(null);
   const [mintSuccess, setMintSuccess] = useState(false);
@@ -74,17 +74,17 @@ const Marketplace = () => {
 
   const handleMint = async (e) => {
     e.preventDefault();
-    if (!mintForm.name.trim() || !mintForm.uri.trim()) { setMintError('Name and URI are required'); return; }
+    if (!mintForm.name.trim()) { setMintError('Name is required'); return; }
     setMinting(true);
     setMintError(null);
     setMintSuccess(false);
     try {
-      const { tokenId } = await mintNFT(mintForm.name.trim(), mintForm.uri.trim());
+      const { tokenId } = await mintNFT(mintForm.name.trim());
       if (mintForm.listPrice && parseFloat(mintForm.listPrice) > 0 && tokenId !== null) {
         await listNFT(tokenId, mintForm.listPrice);
       }
       setMintSuccess(true);
-      setMintForm({ name: '', uri: '', listPrice: '' });
+      setMintForm({ name: '', listPrice: '' });
       setTimeout(() => { setMintSuccess(false); setShowMint(false); }, 2500);
       await fetchNFTs();
     } catch (err) {
@@ -156,12 +156,6 @@ const Marketplace = () => {
                 <div className="p-4">
                   <h3 className="font-semibold text-gray-900 truncate mb-1">{nft.name}</h3>
                   <p className="text-xs text-gray-500 mb-2">Token #{nft.tokenId}</p>
-                  {nft.metadataURI && (
-                    <a href={nft.metadataURI} target="_blank" rel="noopener noreferrer"
-                      className="text-xs text-primary-600 underline flex items-center space-x-1 mb-2">
-                      <span>View Metadata</span><ExternalLink className="w-3 h-3" />
-                    </a>
-                  )}
                   <div className="flex items-center justify-between text-sm mb-2 p-2 bg-gray-50 rounded">
                     <div className="flex items-center space-x-1 text-gray-500"><User className="w-3 h-3" /><span>Owner</span></div>
                     <span className="font-mono text-xs text-gray-700">{formatAddress(nft.owner)}</span>
@@ -223,12 +217,6 @@ const Marketplace = () => {
                 <input type="text" value={mintForm.name}
                   onChange={(e) => setMintForm({ ...mintForm, name: e.target.value })}
                   placeholder="My Awesome NFT" className="input-field" disabled={minting} required />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Metadata URI</label>
-                <input type="text" value={mintForm.uri}
-                  onChange={(e) => setMintForm({ ...mintForm, uri: e.target.value })}
-                  placeholder="ipfs://..." className="input-field" disabled={minting} required />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">List Price (ETH) — optional</label>
