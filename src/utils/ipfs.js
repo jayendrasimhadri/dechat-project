@@ -32,30 +32,30 @@
 // ============================================
 
 const IPFS_CONFIG = {
-  provider: 'pinata', // Options: 'pinata', 'web3storage', 'infura', 'local'
-  
+  provider: process.env.REACT_APP_IPFS_PROVIDER || 'pinata', // Options: 'pinata', 'web3storage', 'infura', 'local'
+
   // Pinata Configuration
   pinata: {
-    apiKey: '0664469eda2c127484ba',
-    apiSecret: '40a2a2b12676db9f486aed6ee3d44106b73e47153508652173bc23ca3a25e188',
+    apiKey: process.env.REACT_APP_PINATA_API_KEY || '',
+    apiSecret: process.env.REACT_APP_PINATA_API_SECRET || '',
     endpoint: 'https://api.pinata.cloud'
   },
-  
+
   // Web3.Storage Configuration
   web3storage: {
-    token: 'YOUR_WEB3_STORAGE_TOKEN'
+    token: process.env.REACT_APP_WEB3_STORAGE_TOKEN || ''
   },
-  
+
   // Infura Configuration
   infura: {
-    projectId: 'YOUR_INFURA_PROJECT_ID',
-    projectSecret: 'YOUR_INFURA_PROJECT_SECRET',
+    projectId: process.env.REACT_APP_INFURA_PROJECT_ID || '',
+    projectSecret: process.env.REACT_APP_INFURA_PROJECT_SECRET || '',
     endpoint: 'https://ipfs.infura.io:5001'
   },
-  
+
   // Local IPFS Node Configuration
   local: {
-    endpoint: 'http://localhost:5001'
+    endpoint: process.env.REACT_APP_IPFS_LOCAL_ENDPOINT || 'http://localhost:5001'
   }
 };
 
@@ -141,8 +141,8 @@ export const getMessageFromIPFS = async (ipfsHash) => {
 async function uploadToPinata(messageData) {
   const { apiKey, apiSecret, endpoint } = IPFS_CONFIG.pinata;
   
-  if (apiKey === 'YOUR_PINATA_API_KEY') {
-    throw new Error('Please configure your Pinata API credentials in src/utils/ipfs.js');
+  if (!apiKey) {
+    throw new Error('Pinata API credentials are not configured. Set REACT_APP_PINATA_API_KEY and REACT_APP_PINATA_API_SECRET in your .env file.');
   }
   
   const response = await fetch(`${endpoint}/pinning/pinJSONToIPFS`, {
@@ -179,8 +179,8 @@ async function uploadToPinata(messageData) {
 async function uploadToWeb3Storage(messageData) {
   const { token } = IPFS_CONFIG.web3storage;
   
-  if (token === 'YOUR_WEB3_STORAGE_TOKEN') {
-    throw new Error('Please configure your Web3.Storage token in src/utils/ipfs.js');
+  if (!token) {
+    throw new Error('Web3.Storage token is not configured. Set REACT_APP_WEB3_STORAGE_TOKEN in your .env file.');
   }
   
   // Note: You'll need to install @web3-storage/w3up-client
@@ -194,11 +194,11 @@ async function uploadToWeb3Storage(messageData) {
 async function uploadToInfura(messageData) {
   const { projectId, projectSecret, endpoint } = IPFS_CONFIG.infura;
   
-  if (projectId === 'YOUR_INFURA_PROJECT_ID') {
-    throw new Error('Please configure your Infura credentials in src/utils/ipfs.js');
+  if (!projectId) {
+    throw new Error('Infura credentials are not configured. Set REACT_APP_INFURA_PROJECT_ID and REACT_APP_INFURA_PROJECT_SECRET in your .env file.');
   }
-  
-  const auth = 'Basic ' + Buffer.from(projectId + ':' + projectSecret).toString('base64');
+
+  const auth = 'Basic ' + btoa(projectId + ':' + projectSecret);
   
   const response = await fetch(`${endpoint}/api/v0/add`, {
     method: 'POST',
@@ -251,11 +251,11 @@ export const isIPFSConfigured = () => {
   
   switch (provider) {
     case 'pinata':
-      return IPFS_CONFIG.pinata.apiKey !== 'YOUR_PINATA_API_KEY';
+      return !!IPFS_CONFIG.pinata.apiKey && !!IPFS_CONFIG.pinata.apiSecret;
     case 'web3storage':
-      return IPFS_CONFIG.web3storage.token !== 'YOUR_WEB3_STORAGE_TOKEN';
+      return !!IPFS_CONFIG.web3storage.token;
     case 'infura':
-      return IPFS_CONFIG.infura.projectId !== 'YOUR_INFURA_PROJECT_ID';
+      return !!IPFS_CONFIG.infura.projectId && !!IPFS_CONFIG.infura.projectSecret;
     case 'local':
       return true; // Assume local is always available if selected
     default:

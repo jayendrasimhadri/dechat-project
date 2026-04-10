@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { getContractReadOnly } from '../utils/contract';
+import { getAllRooms, getNFTsByOwner } from '../utils/contract';
 import { useWallet } from '../contexts/WalletContext';
 import { useChat } from '../contexts/ChatContext';
-import { ethers } from 'ethers';
 import {
   User, MessageSquare, Crown, Copy, ExternalLink, Loader,
   AlertCircle, Lock, Globe, Edit3, Save, X, Plus,
@@ -38,23 +37,24 @@ const Profile = () => {
     setLoading(true);
     setError(null);
     try {
-      const contract = await getContractReadOnly();
       const [allRooms, nfts] = await Promise.all([
-        contract.getAllRooms(),
-        contract.getNFTsByOwner(walletAddress).catch(() => [])
+        getAllRooms(),
+        getNFTsByOwner(walletAddress).catch(() => [])
       ]);
 
+      // getAllRooms returns formatted rooms: id as string, createdAt as ISO string
       setRooms((allRooms || []).filter(r => r.exists).map(r => ({
         id: Number(r.id), name: r.name, creator: r.creator,
-        isPrivate: r.isPrivate, createdAt: Number(r.createdAt)
+        isPrivate: r.isPrivate, createdAt: new Date(r.createdAt).getTime() / 1000
       })));
 
+      // getNFTsByOwner returns formatted NFTs: priceEth already formatted
       setMyNFTs((nfts || []).map(n => ({
         tokenId: Number(n.tokenId),
         name: n.name || `NFT #${n.tokenId}`,
         owner: n.owner,
         metadataURI: n.metadataURI,
-        priceInEth: ethers.formatEther(n.price || 0),
+        priceInEth: n.priceEth,
         isListed: n.isListed
       })));
     } catch (err) {
@@ -64,7 +64,10 @@ const Profile = () => {
     }
   };
 
-  useEffect(() => { fetchData(); }, [walletAddress]);
+  useEffect(() => {
+    fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [walletAddress]);
   useEffect(() => { setEditForm(userProfile || {}); }, [userProfile]);
 
   const copyAddress = async () => {

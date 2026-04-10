@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { getRoom, sendRoomMessage, getRoomMessages, joinPublicRoom, joinPrivateRoom, isMember, parseContractError } from '../utils/contract';
+import { getRoom, getAllRooms, sendRoomMessage, getRoomMessages, joinPublicRoom, joinPrivateRoom, getRoomRequiredNFT, isMember, parseContractError } from '../utils/contract';
 import { onMessageSent } from '../utils/events';
 import { useWallet } from '../contexts/WalletContext';
 import {
@@ -15,6 +15,7 @@ const ChatRoom = () => {
   const [loading, setLoading] = useState(true);
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState(null);
+  const [requiredNFTId, setRequiredNFTId] = useState(null);
   const [newMessage, setNewMessage] = useState('');
   const [sending, setSending] = useState(false);
   const [sendSuccess, setSendSuccess] = useState(false);
@@ -35,7 +36,16 @@ const ChatRoom = () => {
 
   const fetchRoomData = async () => {
     try {
-      const roomData = await getRoom(roomId);
+      let roomData = null;
+
+      // Try getRoom first; fall back to scanning getAllRooms if it reverts
+      try {
+        roomData = await getRoom(roomId);
+      } catch (_) {
+        const allRooms = await getAllRooms();
+        roomData = allRooms.find(r => String(r.id) === String(roomId)) || null;
+      }
+
       if (!roomData?.exists) { setError('Room not found'); return null; }
       const r = {
         id: Number(roomData.id),
@@ -85,6 +95,14 @@ const ChatRoom = () => {
       console.log('[ChatRoom] isMember:', alreadyMember);
 
       if (!alreadyMember) {
+        // For private rooms, fetch the required NFT ID upfront so we can show it on error
+        if (roomData.isPrivate) {
+          try {
+            const nftId = await getRoomRequiredNFT(roomId);
+            setRequiredNFTId(nftId);
+          } catch { /* non-fatal */ }
+        }
+
         setJoining(true);
         try {
           if (roomData.isPrivate) {
@@ -98,12 +116,16 @@ const ChatRoom = () => {
         } catch (joinErr) {
           const msg = parseContractError(joinErr).message;
           console.warn('[ChatRoom] join error:', msg);
-          // "Already a member" is fine — contract may have thrown if race condition
           if (!msg.toLowerCase().includes('already')) {
-            setError(roomData.isPrivate
-              ? `Cannot join private room: ${msg}`
-              : `Cannot join room: ${msg}`
-            );
+            if (roomData.isPrivate) {
+              // Show the specific NFT required
+              const nftHint = requiredNFTId !== null
+                ? `You need to own NFT Token #${requiredNFTId} to enter this room.`
+                : 'You need to own the required access NFT.';
+              setError(nftHint);
+            } else {
+              setError(`Cannot join room: ${msg}`);
+            }
             setLoading(false);
             setJoining(false);
             return;
@@ -168,6 +190,7 @@ const ChatRoom = () => {
         eventListenerRef.current = null;
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomId, walletAddress]); // re-run if wallet connects after mount
 
   useEffect(() => {
@@ -178,6 +201,7 @@ const ChatRoom = () => {
         eventListenerRef.current = null;
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [room, loading, roomId]);
 
   useEffect(() => { scrollToBottom(); }, [messages]);
@@ -196,17 +220,37 @@ const ChatRoom = () => {
     </div>
   );
 
-  if (error || !room) return (
-    <div className="flex items-center justify-center h-full">
-      <div className="text-center max-w-md">
-        <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
-        <h2 className="text-xl font-semibold text-gray-900 mb-2">{error || 'Room not found'}</h2>
-        <Link to="/dashboard" className="btn-primary inline-flex items-center space-x-2">
-          <ArrowLeft className="w-4 h-4" /><span>Back to Dashboard</span>
-        </Link>
+  if (error || !room) {
+    const isNFTError = requiredNFTId !== null && error?.includes('NFT');
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center max-w-md">
+          <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">
+            {isNFTError ? 'NFT Access Required' : (error || 'Room not found')}
+          </h2>
+          {isNFTError && (
+            <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 mb-4 text-left">
+              <p className="text-orange-800 text-sm mb-2">{error}</p>
+              <p className="text-orange-700 text-xs">
+                Go to the Marketplace and buy <strong>NFT Token #{requiredNFTId}</strong> to unlock this room.
+              </p>
+            </div>
+          )}
+          <div className="flex items-center justify-center space-x-3">
+            <Link to="/dashboard" className="btn-secondary inline-flex items-center space-x-2">
+              <ArrowLeft className="w-4 h-4" /><span>Back</span>
+            </Link>
+            {isNFTError && (
+              <Link to="/marketplace" className="btn-primary inline-flex items-center space-x-2">
+                <span>Go to Marketplace</span>
+              </Link>
+            )}
+          </div>
+        </div>
       </div>
-    </div>
-  );
+    );
+  }
 
   if (!walletAddress) return (
     <div className="flex items-center justify-center h-full">

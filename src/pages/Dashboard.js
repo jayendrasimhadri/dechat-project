@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useWallet } from '../contexts/WalletContext';
 import {
@@ -6,6 +6,7 @@ import {
   createPrivateRoomWithNFT as contractCreatePrivateRoom,
   getAllRooms,
   getNFTsByOwner,
+  getRoomRequiredNFT,
   mintNFT,
   listNFT,
   parseContractError,
@@ -13,19 +14,21 @@ import {
 import { onRoomCreated } from '../utils/events';
 import {
   MessageSquare, Users, Crown, Plus, X, Loader,
-  AlertCircle, Lock, Globe, ShoppingCart, RefreshCw
+  AlertCircle, Lock, Globe, ShoppingCart, RefreshCw, Key
 } from 'lucide-react';
 
 const Dashboard = () => {
-  const { walletAddress, ownedNFTs } = useWallet();
+  const { walletAddress, chainId } = useWallet();
+  const networkName = chainId === '0x7a69' ? 'Hardhat Local' : chainId === '0xaa36a7' ? 'Sepolia' : 'Unknown';
   const [rooms, setRooms] = useState([]);
   const [userNFTs, setUserNFTs] = useState([]);
+  // roomId (number) → required NFT tokenId (number)
+  const [roomRequiredNFTs, setRoomRequiredNFTs] = useState({});
   const [loading, setLoading] = useState(true);
   const [showCreateRoom, setShowCreateRoom] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState(null);
-  const [roomForm, setRoomForm] = useState({ name: '', isPrivate: false, mintNFT: false, nftName: '', nftURI: '' });
-  const eventListenerRef = useRef(null); // kept for future use
+  const [roomForm, setRoomForm] = useState({ name: '', isPrivate: false, mintNFT: false, nftName: '' });
 
   const formatAddress = (addr) => addr ? `${addr.slice(0, 6)}...${addr.slice(-4)}` : '';
   const formatDate = (ts) => {
@@ -33,10 +36,12 @@ const Dashboard = () => {
     catch { return 'Unknown'; }
   };
 
-  // Check if user owns any NFT (for private room access)
-  const userOwnsNFT = (room) => {
+  // Check if user owns the SPECIFIC NFT required for this private room
+  const userOwnsRequiredNFT = (room) => {
     if (!room.isPrivate) return true;
-    return userNFTs.length > 0;
+    const requiredId = roomRequiredNFTs[room.id];
+    if (requiredId === undefined) return false; // still loading
+    return userNFTs.some(n => n.tokenId === requiredId);
   };
 
   const fetchUserNFTs = async () => {
@@ -54,10 +59,27 @@ const Dashboard = () => {
     setError(null);
     try {
       const roomsData = await getAllRooms();
-      setRooms(roomsData.filter(r => r.exists).map(r => ({
+      const formatted = roomsData.filter(r => r.exists).map(r => ({
         id: Number(r.id), name: r.name, creator: r.creator,
         isPrivate: r.isPrivate, createdAt: Number(new Date(r.createdAt).getTime() / 1000), exists: r.exists
-      })));
+      }));
+      setRooms(formatted);
+
+      // For every private room, fetch which specific NFT token ID is required
+      const privateRooms = formatted.filter(r => r.isPrivate);
+      if (privateRooms.length > 0) {
+        const entries = await Promise.all(
+          privateRooms.map(async (r) => {
+            try {
+              const nftId = await getRoomRequiredNFT(r.id);
+              return [r.id, nftId];
+            } catch {
+              return [r.id, null];
+            }
+          })
+        );
+        setRoomRequiredNFTs(Object.fromEntries(entries));
+      }
     } catch (err) {
       setError(err.message || 'Failed to load rooms');
     } finally {
@@ -81,6 +103,7 @@ const Dashboard = () => {
   useEffect(() => {
     fetchRooms();
     fetchUserNFTs();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [walletAddress]);
 
   const handleCreateRoom = async (e) => {
@@ -88,24 +111,28 @@ const Dashboard = () => {
     if (!roomForm.name.trim()) { setError('Please enter a room name'); return; }
     if (roomForm.isPrivate && roomForm.mintNFT) {
       if (!roomForm.nftName.trim()) { setError('Please enter an NFT name'); return; }
-      if (!roomForm.nftURI.trim()) { setError('Please enter a metadata URI'); return; }
     }
     setIsCreating(true);
     setError(null);
     try {
-      // If private + mint NFT: mint first, then list it
+      // Track the minted access NFT so we can tie it to the room
+      let accessNFTId = 0; // 0 = let contract auto-mint (creator-only room)
+
       if (roomForm.isPrivate && roomForm.mintNFT) {
-        const { tokenId } = await mintNFT(roomForm.nftName.trim(), roomForm.nftURI.trim());
+        const { tokenId } = await mintNFT(roomForm.nftName.trim());
         if (tokenId !== null) {
-          await listNFT(tokenId, '0.01');
+          await listNFT(String(tokenId), '0.01');
+          accessNFTId = tokenId; // pass this same NFT to the room — not 0
         }
       }
+
       if (roomForm.isPrivate) {
-        await contractCreatePrivateRoom(roomForm.name.trim(), 0);
+        // existingNFTId = the NFT we just minted & listed (or 0 for creator-only)
+        await contractCreatePrivateRoom(roomForm.name.trim(), accessNFTId);
       } else {
         await createPublicRoom(roomForm.name.trim());
       }
-      setRoomForm({ name: '', isPrivate: false, mintNFT: false, nftName: '', nftURI: '' });
+      setRoomForm({ name: '', isPrivate: false, mintNFT: false, nftName: '' });
       setShowCreateRoom(false);
       await fetchRooms();
     } catch (err) {
@@ -136,7 +163,7 @@ const Dashboard = () => {
           { icon: MessageSquare, color: 'primary', label: 'Total Rooms', value: rooms.length },
           { icon: Plus, color: 'blue', label: 'Rooms Created', value: createdRooms.length },
           { icon: Crown, color: 'green', label: 'Owned NFTs', value: userNFTs.length },
-          { icon: Users, color: 'purple', label: 'Network', value: 'Sepolia' },
+          { icon: Users, color: 'purple', label: 'Network', value: networkName },
         ].map(({ icon: Icon, color, label, value }) => (
           <div key={label} className="card">
             <div className="flex items-center space-x-3">
@@ -185,14 +212,16 @@ const Dashboard = () => {
         ) : (
           <div className="space-y-3">
             {rooms.map((room) => {
-              const hasAccess = userOwnsNFT(room);
+              const hasAccess = userOwnsRequiredNFT(room);
+              const requiredNFTId = roomRequiredNFTs[room.id];
+              const isCreator = room.creator?.toLowerCase() === walletAddress?.toLowerCase();
               return (
                 <div key={room.id} className="p-4 rounded-lg border-2 border-gray-200 hover:border-primary-300 transition-all">
                   <div className="flex items-center justify-between">
                     <div className="flex-1">
-                      <div className="flex items-center space-x-2 mb-1">
+                      <div className="flex items-center space-x-2 mb-1 flex-wrap gap-y-1">
                         <h3 className="font-semibold text-gray-900">{room.name}</h3>
-                        {room.creator?.toLowerCase() === walletAddress?.toLowerCase() && (
+                        {isCreator && (
                           <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Creator</span>
                         )}
                         {room.isPrivate ? (
@@ -204,20 +233,34 @@ const Dashboard = () => {
                             <Globe className="w-3 h-3" /><span>Public</span>
                           </span>
                         )}
+                        {room.isPrivate && hasAccess && (
+                          <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full flex items-center space-x-1">
+                            <Crown className="w-3 h-3" /><span>Access Granted</span>
+                          </span>
+                        )}
                       </div>
                       <p className="text-sm text-gray-500">
                         Creator: {formatAddress(room.creator)} • Created: {formatDate(room.createdAt)} • #{room.id}
                       </p>
-                      {room.isPrivate && !hasAccess && (
-                        <p className="text-xs text-orange-600 mt-1">🔒 Requires NFT ownership to join</p>
+                      {room.isPrivate && !hasAccess && requiredNFTId !== undefined && (
+                        <p className="text-xs text-orange-600 mt-1">
+                          🔒 Requires NFT Token #{requiredNFTId} to join
+                        </p>
                       )}
                     </div>
-                    <div className="ml-4">
-                      {hasAccess ? (
+                    <div className="ml-4 flex-shrink-0">
+                      {hasAccess || isCreator ? (
                         <Link to={`/room/${room.id}`} className="btn-primary">Enter Room</Link>
                       ) : (
-                        <Link to="/marketplace" className="btn-secondary flex items-center space-x-1">
-                          <ShoppingCart className="w-4 h-4" /><span>Buy NFT to Join</span>
+                        <Link
+                          to="/marketplace"
+                          className="btn-secondary flex items-center space-x-1"
+                          title={requiredNFTId !== undefined ? `You need NFT Token #${requiredNFTId}` : 'Requires NFT access'}
+                        >
+                          <ShoppingCart className="w-4 h-4" />
+                          <span>
+                            {requiredNFTId !== undefined ? `Get NFT #${requiredNFTId}` : 'Get NFT'}
+                          </span>
                         </Link>
                       )}
                     </div>
@@ -277,22 +320,13 @@ const Dashboard = () => {
                   </label>
 
                   {roomForm.mintNFT && (
-                    <>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">NFT Name</label>
-                        <input type="text" value={roomForm.nftName}
-                          onChange={(e) => setRoomForm({ ...roomForm, nftName: e.target.value })}
-                          placeholder="e.g. RoomKeyNFT" className="input-field" disabled={isCreating}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Metadata URI</label>
-                        <input type="text" value={roomForm.nftURI}
-                          onChange={(e) => setRoomForm({ ...roomForm, nftURI: e.target.value })}
-                          placeholder="ipfs://..." className="input-field" disabled={isCreating}
-                        />
-                      </div>
-                    </>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">NFT Name</label>
+                      <input type="text" value={roomForm.nftName}
+                        onChange={(e) => setRoomForm({ ...roomForm, nftName: e.target.value })}
+                        placeholder="e.g. RoomKeyNFT" className="input-field" disabled={isCreating}
+                      />
+                    </div>
                   )}
                 </div>
               )}
